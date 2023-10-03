@@ -82,7 +82,8 @@ class ReflexCaptureAgent(CaptureAgent):
     """
     print(gameState.getAgentState(self.index))
     actions = gameState.getLegalActions(self.index)
-    values = [self.getFeatures(gameState, a) for a in actions]
+    randomFood = random.sample(self.getFood(gameState).asList(), 4)
+    values = [self.getFeatures(gameState, a, randomFood) for a in actions]
     bestAction = self.evaluate(values)
     return bestAction
   
@@ -92,24 +93,25 @@ class ReflexCaptureAgent(CaptureAgent):
     openqueue = [pos]
     closedqueue = []
     successor = gameState
-    while pos.value != p2:
-      closedqueue.append(pos)
+    eval = 0
+    while len(openqueue) > 0:
+      eval += 1
+      if pos.value == p2:
+        return pos.dfs
+      closedqueue.append(pos.value)
       openqueue.remove(pos)
-      agentState = pos.state.getAgentState(self.index)
-      conf = agentState.configuration
-      possibleActions = Actions.getPossibleActions( conf, pos.state.data.layout.walls )
-      for a in possibleActions:
-        next = self.getSuccessor(successor, a)
-        val = next.getAgentState(self.index).getPosition()
-        dfe = self.getMazeDistance(val,p2)
-        cell = Cell(val, next, pos.dfs + 1, dfe, pos)
-        if not any(x.value == cell.value for x in closedqueue):
-          openqueue.append(cell)
+      legalActions = successor.getLegalActions(self.index)
+      for a in legalActions:
+        if not a == 'Stop':
+          next = self.getSuccessor(successor, a)
+          val = next.getAgentState(self.index).getPosition()
+          if not val in closedqueue:
+            dfe = self.getMazeDistance(val,p2)
+            cell = Cell(val, next, (pos.dfs + 1), dfe, pos)
+            openqueue.append(cell)
       closest = min(openqueue, key=lambda x: x.td)
       pos = closest
       successor = closest.state
-
-    return pos.td
 
   def getSuccessor(self, gameState, action):
     """
@@ -131,7 +133,7 @@ class ReflexCaptureAgent(CaptureAgent):
         best = action
     return best['action']
 
-  def getFeatures(self, gameState, action):
+  def getFeatures(self, gameState, action, foodList):
     """
     Returns a counter of features for the state
     """
@@ -148,10 +150,11 @@ class ReflexCaptureAgent(CaptureAgent):
 
     # Compute distance to the nearest food
     features['distanceFromFood'] = 9999
-    foodList = self.getFood(successor).asList()   
     if len(foodList) > 0: # This should always be True,  but better safe than sorry
       for food in foodList: 
         d = self.astarDistance(successor, food)
+        print(d)
+        # d = self.getMazeDistance(myPos, food)
         if d < features['distanceFromFood']:
           features['distanceFromFood'] = d
 
@@ -160,7 +163,8 @@ class ReflexCaptureAgent(CaptureAgent):
     features['distanceFromEnemy'] = 9999
     for enemy in enemies:
       if enemy.getPosition() != None:
-        d = self.astarDistance(successor, enemy)
+        # d = self.astarDistance(successor, enemy)
+        d = self.getMazeDistance(myPos ,enemy.getPosition())
         if d < features['distanceFromEnemy']:
           features['distanceFromEnemy'] = d
 
