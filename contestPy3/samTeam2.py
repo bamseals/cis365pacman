@@ -80,6 +80,7 @@ class ReflexCaptureAgent(CaptureAgent):
     """
     Picks among the actions with the highest Q(s,a).
     """
+    print(gameState.getAgentState(self.index))
     actions = gameState.getLegalActions(self.index)
     values = [self.getFeatures(gameState, a) for a in actions]
     bestAction = self.evaluate(values)
@@ -108,7 +109,6 @@ class ReflexCaptureAgent(CaptureAgent):
       pos = closest
       successor = closest.state
 
-    print(pos.td)
     return pos.td
 
   def getSuccessor(self, gameState, action):

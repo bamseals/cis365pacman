@@ -68,6 +68,9 @@ class ReflexCaptureAgent(CaptureAgent):
     Picks among the actions with the highest Q(s,a).
     """
     actions = gameState.getLegalActions(self.index)
+    # print(gameState.getAgentState(self.index).numCarrying) # get number of food
+    # self.start = where you start, move to here
+    # self.isPacman = offense or defense
 
     # You can profile your evaluation time by uncommenting these lines
     # start = time.time()
