@@ -82,12 +82,11 @@ class ReflexCaptureAgent(CaptureAgent):
     """
     print(gameState.getAgentState(self.index))
     actions = gameState.getLegalActions(self.index)
-    randomFood = random.sample(self.getFood(gameState).asList(), 4)
-    values = [self.getFeatures(gameState, a, randomFood) for a in actions]
+    values = [self.getFeatures(gameState, a) for a in actions]
     bestAction = self.evaluate(values)
     return bestAction
   
-  def astarDistance(self, p1, p2):
+  def astar(self, p1, p2):
     walls = self.walls
     current = Cell(p1, 0, self.getMazeDistance(p1,p2), None)
     open = [current]
@@ -95,7 +94,7 @@ class ReflexCaptureAgent(CaptureAgent):
     while len(open) > 0:
       closest = min(open, key=lambda x: x.td)
       if closest.value == p2:
-        return closest.dfs
+        return closest
       open.remove(closest)
       closed.append(closest)
       x = closest.value[0]
@@ -105,7 +104,14 @@ class ReflexCaptureAgent(CaptureAgent):
         if not walls[int(n[0])][int(n[1])] and not any(x.value == n for x in closed):
           newcell = Cell(n,closest.dfs+1,self.getMazeDistance(n,p2),closest)
           open.append(newcell)
-    return 9999
+    return None
+  
+  def buildPath(self, cell):
+    path = []
+    while cell.prev != None:
+      path.append(cell.value)
+      cell = cell.prev
+    return path.reverse()
 
   def getSuccessor(self, gameState, action):
     """
@@ -122,12 +128,14 @@ class ReflexCaptureAgent(CaptureAgent):
   def evaluate(self, values):
     # determine which action is best based on calculated values
     best = values[0]
+    print('---------------')
     for action in values:
+      print(action)
       if action['distanceFromFood'] < best['distanceFromFood']:
         best = action
     return best['action']
 
-  def getFeatures(self, gameState, action, foodList):
+  def getFeatures(self, gameState, action):
     """
     Returns a counter of features for the state
     """
@@ -141,22 +149,31 @@ class ReflexCaptureAgent(CaptureAgent):
     # offense or defense
     features['onDefense'] = 1
     if myState.isPacman: features['onDefense'] = 0
+    
+    # if food will be consumed on the next movement the distance from food is zero
+    if len(self.getFood(gameState).asList()) > len(self.getFood(successor).asList()):
+      features['distanceFromFood'] = 0
+    else:
+      # Compute distance to the nearest food
+      foodList = self.getFood(successor).asList()  
+      if len(foodList) > 0: 
+        features['closestFood'] = self.astar(myPos, min(foodList, key=lambda x: self.getMazeDistance(myPos, x)))
+        features['distanceFromFood'] = features['closestFood'].td
 
-    # Compute distance to the nearest food
-    features['distanceFromFood'] = 9999
-    if len(foodList) > 0: # This should always be True,  but better safe than sorry
-      for food in foodList: 
-        d = self.astarDistance(myPos, food)
-        if d < features['distanceFromFood']:
-          features['distanceFromFood'] = d
-
-    # Computer distance to nearest enemy
     enemies = [successor.getAgentState(i) for i in self.getOpponents(successor)]
-    features['distanceFromEnemy'] = 9999
-    for enemy in enemies:
-      if enemy.getPosition() != None:
-        d = self.astarDistance(myPos ,enemy.getPosition())
-        if d < features['distanceFromEnemy']:
-          features['distanceFromEnemy'] = d
+    invaders = [p for p in enemies if p.getPosition() != None and p.isPacman]
+    if len(invaders) > 0:
+      features['invaderPositions'] = map(lambda x: x.getPosition(), invaders)
+      features['closestInvader'] = self.astar(myPos, min(features['invaderPositions'], key=lambda x: self.getMazeDistance(myPos, x)))
+
+    ### Offense only calculations ###
+    if features['onDefense'] == 0:
+      capsules = self.getCapsules(successor)
+      if len(capsules) > 0:  
+        features['closestCapsule'] = self.astar(myPos, min(capsules, key=lambda x: self.getMazeDistance(myPos, x)))
+      ghosts = [p for p in enemies if p.getPosition() != None and not p.isPacman]
+      if len(ghosts) > 0:
+        features['ghostPositions'] = map(lambda x: x.getPosition(), ghosts)
+        features['closestGhost'] = self.astar(myPos, min(features['ghostPositions'], key=lambda x: self.getMazeDistance(myPos, x)))
 
     return features
