@@ -35,14 +35,13 @@ class Cell():
     self.dfe = dfe
     self.td = self.dfs + self.dfe
     self.prev = prev
-  def __eq__(self, other) : 
-    return self.__dict__ == other.__dict__
-
-    
 
 #################
 # Team creation #
 #################
+global index1
+global index2
+global redTeam
 
 def createTeam(firstIndex, secondIndex, isRed,
                first = 'ReflexCaptureAgent', second = 'ReflexCaptureAgent'):
@@ -60,6 +59,12 @@ def createTeam(firstIndex, secondIndex, isRed,
   any extra arguments, so you should make sure that the default
   behavior is what you want for the nightly contest.
   """
+  global index1
+  global index2
+  index1 = firstIndex
+  index2 = secondIndex
+  global redTeam
+  redTeam = isRed
   return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
 ##########
@@ -72,8 +77,13 @@ class ReflexCaptureAgent(CaptureAgent):
   """
  
   def registerInitialState(self, gameState):
+    global index1
+    global index2
+    global redTeam
     self.start = gameState.getAgentPosition(self.index)
     self.walls = gameState.data.layout.walls
+    self.isRed = redTeam
+    self.teamIndex = self.index == index1 and index2 or index1
     CaptureAgent.registerInitialState(self, gameState)
 
   def chooseAction(self, gameState):
@@ -108,10 +118,11 @@ class ReflexCaptureAgent(CaptureAgent):
   
   def buildPath(self, cell):
     path = []
-    while cell.prev != None:
+    while not cell.prev == None:
       path.append(cell.value)
       cell = cell.prev
-    return path.reverse()
+    path.reverse()
+    return path
 
   def getSuccessor(self, gameState, action):
     """
@@ -139,6 +150,8 @@ class ReflexCaptureAgent(CaptureAgent):
     """
     Returns a counter of features for the state
     """
+    print(self.index)
+    print(self.teamIndex)
     features = util.Counter()
     features['action'] = action
     successor = self.getSuccessor(gameState, action)
@@ -149,17 +162,19 @@ class ReflexCaptureAgent(CaptureAgent):
     # offense or defense
     features['onDefense'] = 1
     if myState.isPacman: features['onDefense'] = 0
-    
+
+    # find food
+    foodList = self.getFood(successor).asList()  
     # if food will be consumed on the next movement the distance from food is zero
     if len(self.getFood(gameState).asList()) > len(self.getFood(successor).asList()):
       features['distanceFromFood'] = 0
     else:
       # Compute distance to the nearest food
-      foodList = self.getFood(successor).asList()  
       if len(foodList) > 0: 
         features['closestFood'] = self.astar(myPos, min(foodList, key=lambda x: self.getMazeDistance(myPos, x)))
         features['distanceFromFood'] = features['closestFood'].td
 
+    ### find enemies ###
     enemies = [successor.getAgentState(i) for i in self.getOpponents(successor)]
     invaders = [p for p in enemies if p.getPosition() != None and p.isPacman]
     if len(invaders) > 0:
@@ -167,6 +182,7 @@ class ReflexCaptureAgent(CaptureAgent):
       features['closestInvader'] = self.astar(myPos, min(features['invaderPositions'], key=lambda x: self.getMazeDistance(myPos, x)))
 
     ### Offense only calculations ###
+    ghosts = []
     if features['onDefense'] == 0:
       capsules = self.getCapsules(successor)
       if len(capsules) > 0:  
@@ -175,5 +191,19 @@ class ReflexCaptureAgent(CaptureAgent):
       if len(ghosts) > 0:
         features['ghostPositions'] = map(lambda x: x.getPosition(), ghosts)
         features['closestGhost'] = self.astar(myPos, min(features['ghostPositions'], key=lambda x: self.getMazeDistance(myPos, x)))
+
+
+    ## check if teammate or ghosts block the path to closest food, if so find a clear path
+    if (features['distanceFromFood'] > 1):
+      obstacles = [successor.getAgentState(self.teamIndex).getPosition()]
+      if len(ghosts) > 0:
+        for g in features['ghostPositions']:
+          obstacles.append(g)
+      foodPath = self.buildPath(features['closestFood'])
+      while any(i in foodPath for i in obstacles) and len(foodList) > 1:
+        foodList.remove(features['closestFood'].value)
+        features['closestFood'] = self.astar(myPos, min(foodList, key=lambda x: self.getMazeDistance(myPos, x)))
+        features['distanceFromFood'] = features['closestFood'].td
+
 
     return features
