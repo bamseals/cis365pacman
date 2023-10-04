@@ -29,9 +29,8 @@ import game
 from util import nearestPoint
 
 class Cell():
-  def __init__(self, value, state, dfs, dfe, prev):
+  def __init__(self, value, dfs, dfe, prev):
     self.value = value
-    self.state = state
     self.dfs = dfs
     self.dfe = dfe
     self.td = self.dfs + self.dfe
@@ -74,6 +73,7 @@ class ReflexCaptureAgent(CaptureAgent):
  
   def registerInitialState(self, gameState):
     self.start = gameState.getAgentPosition(self.index)
+    self.walls = gameState.data.layout.walls
     CaptureAgent.registerInitialState(self, gameState)
 
   def chooseAction(self, gameState):
@@ -87,31 +87,25 @@ class ReflexCaptureAgent(CaptureAgent):
     bestAction = self.evaluate(values)
     return bestAction
   
-  def astarDistance(self, gameState, p2):
-    loc = gameState.getAgentState(self.index).getPosition()
-    pos = Cell(loc, gameState, 0, self.getMazeDistance(loc,p2), None)
-    openqueue = [pos]
-    closedqueue = []
-    successor = gameState
-    eval = 0
-    while len(openqueue) > 0:
-      eval += 1
-      if pos.value == p2:
-        return pos.dfs
-      closedqueue.append(pos.value)
-      openqueue.remove(pos)
-      legalActions = successor.getLegalActions(self.index)
-      for a in legalActions:
-        if not a == 'Stop':
-          next = self.getSuccessor(successor, a)
-          val = next.getAgentState(self.index).getPosition()
-          if not val in closedqueue:
-            dfe = self.getMazeDistance(val,p2)
-            cell = Cell(val, next, (pos.dfs + 1), dfe, pos)
-            openqueue.append(cell)
-      closest = min(openqueue, key=lambda x: x.td)
-      pos = closest
-      successor = closest.state
+  def astarDistance(self, p1, p2):
+    walls = self.walls
+    current = Cell(p1, 0, self.getMazeDistance(p1,p2), None)
+    open = [current]
+    closed = []
+    while len(open) > 0:
+      closest = min(open, key=lambda x: x.td)
+      if closest.value == p2:
+        return closest.dfs
+      open.remove(closest)
+      closed.append(closest)
+      x = closest.value[0]
+      y = closest.value[1]
+      neighbors = [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
+      for n in neighbors:
+        if not walls[int(n[0])][int(n[1])] and not any(x.value == n for x in closed):
+          newcell = Cell(n,closest.dfs+1,self.getMazeDistance(n,p2),closest)
+          open.append(newcell)
+    return 9999
 
   def getSuccessor(self, gameState, action):
     """
@@ -152,9 +146,7 @@ class ReflexCaptureAgent(CaptureAgent):
     features['distanceFromFood'] = 9999
     if len(foodList) > 0: # This should always be True,  but better safe than sorry
       for food in foodList: 
-        d = self.astarDistance(successor, food)
-        print(d)
-        # d = self.getMazeDistance(myPos, food)
+        d = self.astarDistance(myPos, food)
         if d < features['distanceFromFood']:
           features['distanceFromFood'] = d
 
@@ -163,8 +155,7 @@ class ReflexCaptureAgent(CaptureAgent):
     features['distanceFromEnemy'] = 9999
     for enemy in enemies:
       if enemy.getPosition() != None:
-        # d = self.astarDistance(successor, enemy)
-        d = self.getMazeDistance(myPos ,enemy.getPosition())
+        d = self.astarDistance(myPos ,enemy.getPosition())
         if d < features['distanceFromEnemy']:
           features['distanceFromEnemy'] = d
 

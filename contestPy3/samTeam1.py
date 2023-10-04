@@ -165,7 +165,6 @@ class ReflexCaptureAgent(CaptureAgent):
     while len(open) > 0:
       closest = min(open, key=lambda x: x.td)
       if closest.value == p2:
-        print(closest.dfs)
         return closest.dfs
       open.remove(closest)
       closed.append(closest)
@@ -247,7 +246,7 @@ class DefensiveReflexAgent(ReflexCaptureAgent):
     invaders = [a for a in enemies if a.isPacman and a.getPosition() != None]
     features['numInvaders'] = len(invaders)
     if len(invaders) > 0:
-      dists = [self.getMazeDistance(myPos, a.getPosition()) for a in invaders]
+      dists = [self.astarDistance2(myPos, a.getPosition()) for a in invaders]
       features['invaderDistance'] = min(dists)
 
     if action == Directions.STOP: features['stop'] = 1
