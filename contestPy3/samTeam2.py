@@ -139,10 +139,21 @@ class ReflexCaptureAgent(CaptureAgent):
   def evaluate(self, values):
     # determine which action is best based on calculated values
     best = values[0]
+    bestweight = 9999
     print('---------------')
+    print(values)
     for action in values:
-      print(action)
-      if action['distanceFromFood'] < best['distanceFromFood']:
+      if action['special'] != None and (action['special'] / 10) <  bestweight:
+        bestweight = (action['special'] / 20)
+        best = action
+      if action['retreat'] != None and (action['retreat'] / 3) <  bestweight:
+        bestweight = (action['retreat'] / 15)
+        best = action
+      if action['defense'] != None and (action['defense'] / 2) <  bestweight:
+        bestweight = (action['defense'] / 2)
+        best = action
+      if action['offense'] != None and (action['offense']) <  bestweight:
+        bestweight = (action['offense'])
         best = action
     return best['action']
 
@@ -150,18 +161,21 @@ class ReflexCaptureAgent(CaptureAgent):
     """
     Returns a counter of features for the state
     """
-    print(self.index)
-    print(self.teamIndex)
-    features = util.Counter()
+    features = {}
     features['action'] = action
-    successor = self.getSuccessor(gameState, action)
+    features['offense'] = None
+    features['defense'] = None
+    features['retreat'] = None
+    features['special'] = None
 
+    successor = self.getSuccessor(gameState, action)
     myState = successor.getAgentState(self.index)
     myPos = myState.getPosition()
     
     # offense or defense
     features['onDefense'] = 1
     if myState.isPacman: features['onDefense'] = 0
+    features['foodCarrying'] = myState.numCarrying
 
     # find food
     foodList = self.getFood(successor).asList()  
@@ -176,10 +190,15 @@ class ReflexCaptureAgent(CaptureAgent):
 
     ### find enemies ###
     enemies = [successor.getAgentState(i) for i in self.getOpponents(successor)]
+    prevEnemies = [gameState.getAgentState(i) for i in self.getOpponents(gameState)]
     invaders = [p for p in enemies if p.getPosition() != None and p.isPacman]
+    prevInvaders = [p for p in prevEnemies if p.getPosition() != None and p.isPacman]
+    features['numInvaders'] = len(invaders)
+    features['numPrevInvaders'] = len(prevInvaders)
     if len(invaders) > 0:
-      features['invaderPositions'] = map(lambda x: x.getPosition(), invaders)
+      features['invaderPositions'] = list(map(lambda x: x.getPosition(), invaders))
       features['closestInvader'] = self.astar(myPos, min(features['invaderPositions'], key=lambda x: self.getMazeDistance(myPos, x)))
+      features['distanceToInvader'] = features['closestInvader'].td
 
     ### Offense only calculations ###
     ghosts = []
@@ -187,11 +206,27 @@ class ReflexCaptureAgent(CaptureAgent):
       capsules = self.getCapsules(successor)
       if len(capsules) > 0:  
         features['closestCapsule'] = self.astar(myPos, min(capsules, key=lambda x: self.getMazeDistance(myPos, x)))
+        features['distanceToCapsule'] = features['closestCapsule'].td
       ghosts = [p for p in enemies if p.getPosition() != None and not p.isPacman]
       if len(ghosts) > 0:
-        features['ghostPositions'] = map(lambda x: x.getPosition(), ghosts)
+        features['ghostPositions'] = list(map(lambda x: x.getPosition(), ghosts))
         features['closestGhost'] = self.astar(myPos, min(features['ghostPositions'], key=lambda x: self.getMazeDistance(myPos, x)))
-
+        features['distanceToGhost'] = features['closestGhost'].td
+      # if you can get to a pellet before the closest defender, go for it
+      if 'distanceToGhost' in features and 'distanceToCapsule' in features and features['distanceToGhost'] < 10 and features['distanceToCapsule'] < features['distanceToGhost']:
+        features['special'] = features['distanceToCapsule']
+      else:
+        # retreat based on number of food carried versus how close defenders are
+        if 'distanceToGhost' in features and features['distanceToGhost'] < (features['foodCarrying'] * 2):
+          features['retreat'] = self.getMazeDistance(myPos,self.start)
+    ### Defense only calculations ###
+    else:
+      if features['numPrevInvaders'] > 0:
+        print(action)
+        if features['numPrevInvaders'] > features['numInvaders']:
+          features['defense'] = 0
+        else:
+          features['defense'] = features['distanceToInvader']
 
     ## check if teammate or ghosts block the path to closest food, if so find a clear path
     if (features['distanceFromFood'] > 1):
@@ -204,6 +239,6 @@ class ReflexCaptureAgent(CaptureAgent):
         foodList.remove(features['closestFood'].value)
         features['closestFood'] = self.astar(myPos, min(foodList, key=lambda x: self.getMazeDistance(myPos, x)))
         features['distanceFromFood'] = features['closestFood'].td
-
+    features['offense'] = features['distanceFromFood']
 
     return features
