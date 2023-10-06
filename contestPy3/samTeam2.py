@@ -138,20 +138,24 @@ class ReflexCaptureAgent(CaptureAgent):
 
   def evaluate(self, values):
     # determine which action is best based on calculated values
-    weights = {'special': 200, "retreat": 100, "defense": 2, "offense": 1}
+    weights = {'special': 100, "retreat": 50, "defense": 2, "offense": 1}
     best = values[0]
     bestweight = 9999
+    # print(values)
     for action in values:
       # high priority actions like eating capsule of enemy is near
       if action['special'] != None and (action['special'] / weights['special']) <  bestweight:
         bestweight = (action['special'] / weights['special'])
         best = action
+      # running away to deposit food
       if action['retreat'] != None and (action['retreat'] / weights['retreat']) <  bestweight:
         bestweight = (action['retreat'] / weights['retreat'])
         best = action
+      # killing an enemy
       if action['defense'] != None and (action['defense'] / weights['defense']) <  bestweight:
         bestweight = (action['defense'] / weights['defense'])
         best = action
+      # seeking food
       if action['offense'] != None and (action['offense'] / weights['offense']) <  bestweight:
         bestweight = (action['offense'] / weights['offense'])
         best = action
@@ -159,7 +163,7 @@ class ReflexCaptureAgent(CaptureAgent):
 
   def survey(self, gameState, action):
     """
-    Returns a counter of data for the state
+    observe information about the state of the game for this move
     """
     data = {}
     data['action'] = action
@@ -221,7 +225,6 @@ class ReflexCaptureAgent(CaptureAgent):
       # if a move would deposit food on your side
         # retreat based on number of food carried versus how close defenders are
       if ('distanceToGhost' in data and data['distanceToGhost'] < (data['foodCarrying'] * 2)) or data['foodCarrying'] >= 1:
-        print(action)
         data['retreat'] = self.getMazeDistance(myPos,self.start)
     ### Defense only calculations ###
     else:
@@ -235,13 +238,15 @@ class ReflexCaptureAgent(CaptureAgent):
       if data['prevFoodCarrying'] > 0 and data['foodCarrying'] == 0:
         data['retreat'] = 0
 
-    ## check if teammate or ghosts block the path to closest food, if so find a clear path
+    ## check if teammate or ghosts block the path to closest food
     if 'closestFood' in data and data['distanceFromFood'] > 1:
       obstacles = [successor.getAgentState(self.teamIndex).getPosition()]
       if len(ghosts) > 0:
         for g in data['ghostPositions']:
           obstacles.append(g)
       foodPath = self.buildPath(data['closestFood'])
+      # if so find a more preferable path
+      # this prevents one agent from following another around
       while any(i in foodPath for i in obstacles) and len(foodList) > 1:
         foodList.remove(data['closestFood'].value)
         data['closestFood'] = self.astar(myPos, min(foodList, key=lambda x: self.getMazeDistance(myPos, x)))
