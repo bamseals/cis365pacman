@@ -90,7 +90,7 @@ class ReflexCaptureAgent(CaptureAgent):
     """
     Picks among the actions with the highest Q(s,a).
     """
-    print(gameState.getAgentState(self.index))
+    # print(gameState.getAgentState(self.index))
     actions = gameState.getLegalActions(self.index)
     values = [self.survey(gameState, a) for a in actions]
     bestAction = self.evaluate(values)
@@ -140,8 +140,8 @@ class ReflexCaptureAgent(CaptureAgent):
     # determine which action is best based on calculated values
     best = values[0]
     bestweight = 9999
-    print('---------------')
-    print(values)
+    # print('---------------')
+    # print(values)
     for action in values:
       if action['special'] != None and (action['special'] / 10) <  bestweight:
         bestweight = (action['special'] / 20)
@@ -177,6 +177,7 @@ class ReflexCaptureAgent(CaptureAgent):
     if myState.isPacman: data['onDefense'] = 0
     data['foodCarrying'] = myState.numCarrying
 
+    data['distanceFromFood'] = 9999
     # find food
     foodList = self.getFood(successor).asList()  
     # if food will be consumed on the next movement the distance from food is zero
@@ -222,14 +223,13 @@ class ReflexCaptureAgent(CaptureAgent):
     ### Defense only calculations ###
     else:
       if data['numPrevInvaders'] > 0:
-        print(action)
         if data['numPrevInvaders'] > data['numInvaders']:
           data['defense'] = 0
         else:
           data['defense'] = data['distanceToInvader']
 
     ## check if teammate or ghosts block the path to closest food, if so find a clear path
-    if (data['distanceFromFood'] > 1):
+    if 'closestFood' in data and data['distanceFromFood'] > 1:
       obstacles = [successor.getAgentState(self.teamIndex).getPosition()]
       if len(ghosts) > 0:
         for g in data['ghostPositions']:

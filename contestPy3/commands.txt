@@ -1,2 +1,5 @@
 python capture.py -r baselineTeam.py -b improvedTeam.py
 python capture.py -r baselineTeam.py -b samTeam2.py
+
+-- text only --
+python capture.py -t -r baselineTeam.py -b samTeam2.py
