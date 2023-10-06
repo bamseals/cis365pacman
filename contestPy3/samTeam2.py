@@ -138,22 +138,22 @@ class ReflexCaptureAgent(CaptureAgent):
 
   def evaluate(self, values):
     # determine which action is best based on calculated values
+    weights = {'special': 200, "retreat": 100, "defense": 2, "offense": 1}
     best = values[0]
     bestweight = 9999
-    # print('---------------')
-    # print(values)
     for action in values:
-      if action['special'] != None and (action['special'] / 10) <  bestweight:
-        bestweight = (action['special'] / 20)
+      # high priority actions like eating capsule of enemy is near
+      if action['special'] != None and (action['special'] / weights['special']) <  bestweight:
+        bestweight = (action['special'] / weights['special'])
         best = action
-      if action['retreat'] != None and (action['retreat'] / 3) <  bestweight:
-        bestweight = (action['retreat'] / 15)
+      if action['retreat'] != None and (action['retreat'] / weights['retreat']) <  bestweight:
+        bestweight = (action['retreat'] / weights['retreat'])
         best = action
-      if action['defense'] != None and (action['defense'] / 2) <  bestweight:
-        bestweight = (action['defense'] / 2)
+      if action['defense'] != None and (action['defense'] / weights['defense']) <  bestweight:
+        bestweight = (action['defense'] / weights['defense'])
         best = action
-      if action['offense'] != None and (action['offense']) <  bestweight:
-        bestweight = (action['offense'])
+      if action['offense'] != None and (action['offense'] / weights['offense']) <  bestweight:
+        bestweight = (action['offense'] / weights['offense'])
         best = action
     return best['action']
 
@@ -169,6 +169,7 @@ class ReflexCaptureAgent(CaptureAgent):
     data['special'] = None
 
     successor = self.getSuccessor(gameState, action)
+    prevState = gameState.getAgentState(self.index)
     myState = successor.getAgentState(self.index)
     myPos = myState.getPosition()
     
@@ -176,6 +177,7 @@ class ReflexCaptureAgent(CaptureAgent):
     data['onDefense'] = 1
     if myState.isPacman: data['onDefense'] = 0
     data['foodCarrying'] = myState.numCarrying
+    data['prevFoodCarrying'] = prevState.numCarrying
 
     data['distanceFromFood'] = 9999
     # find food
@@ -216,17 +218,22 @@ class ReflexCaptureAgent(CaptureAgent):
       # if you can get to a pellet before the closest defender, go for it
       if 'distanceToGhost' in data and 'distanceToCapsule' in data and data['distanceToGhost'] < 10 and data['distanceToCapsule'] < data['distanceToGhost']:
         data['special'] = data['distanceToCapsule']
-      else:
+      # if a move would deposit food on your side
         # retreat based on number of food carried versus how close defenders are
-        if 'distanceToGhost' in data and data['distanceToGhost'] < (data['foodCarrying'] * 2):
-          data['retreat'] = self.getMazeDistance(myPos,self.start)
+      if ('distanceToGhost' in data and data['distanceToGhost'] < (data['foodCarrying'] * 2)) or data['foodCarrying'] >= 1:
+        print(action)
+        data['retreat'] = self.getMazeDistance(myPos,self.start)
     ### Defense only calculations ###
     else:
       if data['numPrevInvaders'] > 0:
+        # this move would kill an enemy
         if data['numPrevInvaders'] > data['numInvaders']:
           data['defense'] = 0
         else:
           data['defense'] = data['distanceToInvader']
+      # moving back onto defense would deposit carried food
+      if data['prevFoodCarrying'] > 0 and data['foodCarrying'] == 0:
+        data['retreat'] = 0
 
     ## check if teammate or ghosts block the path to closest food, if so find a clear path
     if 'closestFood' in data and data['distanceFromFood'] > 1:
