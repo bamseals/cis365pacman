@@ -1,167 +1,154 @@
 from captureAgents import CaptureAgent
-import distanceCalculator
-import random, time, util, sys
-from game import Directions
-import game
-from util import nearestPoint
-
+from game import Directions, Actions
+from queue import PriorityQueue
 
 class ReflexCaptureAgent(CaptureAgent):
-    def registerInitialState(self, gameState):
-        self.start = gameState.getAgentPosition(self.index)
-        self.isOffensive = gameState.getAgentState(self.index).isPacman
-        CaptureAgent.registerInitialState(self, gameState)
+    def findPathToClosestFood(self, gameState):
+        def dijkstra(graph, start):
+            distances = {node: float('inf') for node in graph}
+            distances[start] = 0
+            queue = PriorityQueue()
+            queue.put((0, start))
+
+            while not queue.empty():
+                current_distance, current_node = queue.get()
+
+                if current_distance > distances[current_node]:
+                    continue
+
+                for neighbor, weight in graph[current_node].items():
+                    distance = current_distance + weight
+
+                    if distance < distances[neighbor]:
+                        distances[neighbor] = distance
+                        queue.put((distance, neighbor))
+
+            return distances
+
+        # Build a graph representing the game state
+        graph = {}
+        walls = gameState.getWalls()
+        for x in range(walls.width):
+            for y in range(walls.height):
+                if not walls[x][y]:
+                    neighbors = {}
+                    for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+                        dx, dy = Actions.directionToVector(action)
+                        next_x, next_y = int(x + dx), int(y + dy)
+                        if not walls[next_x][next_y]:
+                            neighbors[(next_x, next_y)] = 1
+                    graph[(x, y)] = neighbors
+
+        myPos = gameState.getAgentPosition(self.index)
+        foodList = self.getFood(gameState).asList()
+        targetFood = min(foodList, key=lambda x: self.getMazeDistance(myPos, x))
+
+        # Run Dijkstra's algorithm to find the shortest path to the target food
+        distances = dijkstra(graph, myPos)
+        path = []
+
+        while targetFood != myPos:
+            for next_x, next_y in graph[targetFood]:
+                if distances[targetFood] - distances[(next_x, next_y)] == 1:
+                    action = Actions.vectorToDirection((next_x - targetFood[0], next_y - targetFood[1]))
+                    path.append(action)
+                    targetFood = (next_x, next_y)
+
+        if path:
+            return path[0]
+        else:
+            return Directions.STOP
+
+    def explore(self, gameState):
+        print("Entering explore function")
+
+        def getValidNeighbors(position, visited):
+            valid_neighbors = []
+            x, y = position
+            for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+                dx, dy = Actions.directionToVector(action)
+                next_x, next_y = int(x + dx), int(y + dy)
+                if not visited[next_x][next_y]:
+                    valid_neighbors.append((next_x, next_y))
+            return valid_neighbors
+
+        def bfs(starting_position):
+            visited = [[False for _ in range(gameState.data.layout.width)] for _ in range(gameState.data.layout.height)]
+            queue = [(starting_position, [])]
+            while queue:
+                current_position, path = queue.pop(0)
+                if not visited[current_position[0]][current_position[1]]:
+                    visited[current_position[0]][current_position[1]] = True
+                    if gameState.data.layout.isWall(current_position[0], current_position[1]):
+                        continue  # Don't explore walls
+                    if not gameState.data.layout.isFood(current_position[0], current_position[1]):
+                        return path  # Return the first non-food path found
+                    for neighbor in getValidNeighbors(current_position, visited):
+                        queue.append((neighbor, path + [neighbor]))
+
+        myPos = gameState.getAgentPosition(self.index)
+        print("Current Position:", myPos)  # Debug print
+        path = bfs(myPos)
+
+        if path:
+            next_position = path[0]
+            dx, dy = next_position[0] - myPos[0], next_position[1] - myPos[1]
+            print("Next Position:", next_position)  # Debug print
+            return Actions.vectorToDirection((dx, dy))
+
+        # Handle the case where there's no path found (e.g., continue in the current direction)
+        current_direction = gameState.getAgentState(self.index).configuration.direction
+        print("Current Direction:", current_direction)  # Debug print
+        return current_direction
+
+    def patrolBase(self, gameState):
+        # Basic defensive strategy: move between two predefined positions
+        if gameState.isOnRedTeam(self.index):
+            positions = [(10, 5), (10, 6)]  # Example positions for red team
+        else:
+            positions = [(17, 6), (17, 5)]  # Example positions for blue team
+
+        if self.patrolTarget == positions[0]:
+            self.patrolTarget = positions[1]
+        else:
+            self.patrolTarget = positions[0]
+
+        return self.findPathToClosestFood(gameState)
 
     def chooseAction(self, gameState):
         actions = gameState.getLegalActions(self.index)
-        # print(gameState.getAgentState(self.index).numCarrying) # get number of food
-        # self.start = where you start, move to here
-        # self.isPacman = offense or defense
+        myState = gameState.getAgentState(self.index)
+        myPos = myState.getPosition()
+        foodList = self.getFood(gameState).asList()
 
-        for action in actions:
-            successor = self.getSuccessor(gameState, action)
-            score = self.evaluateOffensive(gameState, action)
-
-            if score > bestScore:
-                bestScore = score
-                bestAction = action
-
-        return bestAction
-
-    def evaluateOffensive(self, gameState, action):
-        # Implement improved offensive evaluation here
-        features = self.getOffensiveFeatures(gameState, action)
-        weights = self.getOffensiveWeights(gameState, action)
-        return features * weights
-
-    def defensiveAction(self, gameState, actions):
-        # Implement improved defensive strategy here
-        bestAction = Directions.STOP  # Default to STOP
-        bestScore = -float("inf")
-
-        for action in actions:
-            successor = self.getSuccessor(gameState, action)
-            score = self.evaluateDefensive(gameState, action)
-
-            if score > bestScore:
-                bestScore = score
-                bestAction = action
-
-        return bestAction
-
-    def evaluateDefensive(self, gameState, action):
-        # Implement improved defensive evaluation here
-        features = self.getDefensiveFeatures(gameState, action)
-        weights = self.getDefensiveWeights(gameState, action)
-        return features * weights
-
-    def getSuccessor(self, gameState, action):
-        successor = gameState.generateSuccessor(self.index, action)
-        pos = successor.getAgentState(self.index).getPosition()
-        if pos != nearestPoint(pos):
-            # Only half a grid position was covered
-            return successor.generateSuccessor(self.index, action)
+        if not self.red:
+            return self.offensiveStrategy(gameState)
         else:
-            return successor
+            return self.defensiveStrategy(gameState)
 
-    # Implement feature functions for offense and defense
-    def getOffensiveFeatures(self, gameState, action):
-        features = util.Counter()
-
-        # Implement offensive feature functions here
-        # Example: features['featureName'] = featureValue
-
-        return features
-
-    def getOffensiveWeights(self, gameState, action):
-        weights = util.Counter()
-
-        # Implement offensive weights here
-        # Example: weights['featureName'] = featureWeight
-
-        return weights
-
-    def getDefensiveFeatures(self, gameState, action):
-        features = util.Counter()
-
-        # Implement defensive feature functions here
-        # Example: features['featureName'] = featureValue
-
-        return features
-
-    def getDefensiveWeights(self, gameState, action):
-        weights = util.Counter()
-
-        # Implement defensive weights here
-        # Example: weights['featureName'] = featureWeight
-
-        return weights
-
-
-class OffensiveReflexAgent(ReflexCaptureAgent):
-    def getOffensiveFeatures(self, gameState, action):
-        features = util.Counter()
-        successor = self.getSuccessor(gameState, action)
-
-        myState = successor.getAgentState(self.index)
+    def offensiveStrategy(self, gameState):
+        actions = gameState.getLegalActions(self.index)
+        myState = gameState.getAgentState(self.index)
         myPos = myState.getPosition()
+        foodList = self.getFood(gameState).asList()
 
-        foodList = self.getFood(successor).asList()
-        features['successorScore'] = -len(foodList)
-
-        # Compute distance to the nearest food
+        # Strategy: Seek food
         if len(foodList) > 0:
-            minDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
-            features['distanceToFood'] = minDistance
+            action = self.findPathToClosestFood(gameState)
+        else:
+            action = self.explore(gameState)
 
-        # Implement additional offensive features here
+        return action
 
-        return features
-
-    def getOffensiveWeights(self, gameState, action):
-        weights = util.Counter()
-        weights['successorScore'] = 100
-        weights['distanceToFood'] = -1
-
-        # Implement additional offensive weights here
-
-        return weights
-
-
-class DefensiveReflexAgent(ReflexCaptureAgent):
-    def getDefensiveFeatures(self, gameState, action):
-        features = util.Counter()
-        successor = self.getSuccessor(gameState, action)
-
-        myState = successor.getAgentState(self.index)
+    def defensiveStrategy(self, gameState):
+        actions = gameState.getLegalActions(self.index)
+        myState = gameState.getAgentState(self.index)
         myPos = myState.getPosition()
 
-        enemies = [successor.getAgentState(i) for i in self.getOpponents(successor)]
-        invaders = [a for a in enemies if a.isPacman and a.getPosition() is not None]
-        features['numInvaders'] = len(invaders)
-        if len(invaders) > 0:
-            dists = [self.getMazeDistance(myPos, a.getPosition()) for a in invaders]
-            features['invaderDistance'] = min(dists)
+        # Strategy: Defend the base
+        action = self.patrolBase(gameState)
+        return action
 
-        if action == Directions.STOP:
-            features['stop'] = 1
-        rev = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
-        if action == rev:
-            features['reverse'] = 1
-
-        return features
-
-    def getDefensiveWeights(self, gameState, action):
-        weights = util.Counter()
-        weights['numInvaders'] = -1000
-        weights['stop'] = -100
-        weights['invaderDistance'] = -10
-        weights['reverse'] = -2
-
-        return weights
-
-
-# The createTeam function remains unchanged
 def createTeam(firstIndex, secondIndex, isRed,
-               first='OffensiveReflexAgent', second='DefensiveReflexAgent'):
+               first='ReflexCaptureAgent', second='ReflexCaptureAgent'):
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
