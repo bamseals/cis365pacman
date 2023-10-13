@@ -14,7 +14,7 @@ from util import nearestPoint
 #################
 
 def createTeam(firstIndex, secondIndex, isRed,
-               first='DefensiveReflexAgent', second='OffensiveReflexAgent'):
+               first='OffensiveReflexAgent', second='OffensiveReflexAgent'):
     """
     This function should return a list of two agents that will form the
     team, initialized using firstIndex and secondIndex as their agent
@@ -99,8 +99,8 @@ class ReflexCaptureAgent(CaptureAgent):
         features = self.getFeatures(gameState, action)
         weights = self.getWeights(gameState, action)
 
-        # if self.index == 1: # This line prints only the first blue agent's information
-        # print(str(features) + str(weights), file=sys.stderr)
+        #  if self.index == 1: # This line prints only the first blue agent's information
+        print(str(features) + str(weights), file=sys.stderr)
             # print(gameState.getAgentState(self.index)) # Print out a text representation of the world.
 
         return features * weights
@@ -156,9 +156,12 @@ class ReflexCaptureAgent(CaptureAgent):
         """
         Finds the distance from the agent to the Power Capsule
         """
-        PC = self.getCapsules(gameState)[0]
-        myPos = gameState.getAgentState(self.index).getPosition()
-        return self.getMazeDistance(myPos, PC)
+        if len(self.getCapsules(gameState)) > 0:
+            PC = self.getCapsules(gameState)[0]
+            myPos = gameState.getAgentState(self.index).getPosition()
+            return self.getMazeDistance(myPos, PC)
+        else:
+            return -1
 
     def estEnemyDist(self, gameState):
         """
@@ -191,6 +194,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
         myState = successor.getAgentState(self.index)
         myPos = myState.getPosition()
+        foodList = self.getFood(successor).asList()
 
         ''' CLOSEST/AMOUNT OF ENEMY/IES FEATURES '''
         # Determine if the enemy is closer to you than they were last time
@@ -212,14 +216,22 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
                         self.getMazeDistance(myPos, self.start))
             if successor.getAgentState(self.index).isPacman:  # and notInWay:
                 # RUN HOME
-                if close_dist < 4:  # TODO adjust for if enemy is pacman - flee towards
+                if close_dist < 5:  # TODO adjust for if enemy is pacman - flee towards
                     features['fleeHome'] = self.getMazeDistance(myPos, self.start)
             elif not successor.getAgentState(self.index).isPacman:  # and notInWay:
                 # If you are a ghost, you are only in danger if you cross the border
-                if action == Directions.STOP:  # TODO adjust for if enemy is pacman - kill
-                    # TODO move one more away first to prevent deadlocks
-                    features['settle'] = 1
+                if(self.index == 0 or self.index == 2):
+                    if action == Directions.WEST and close_dist < 4:  # TODO adjust for if enemy is pacman - kill
+                        # TODO move one more away first to prevent deadlocks
+                        features['settle'] = 1
+                elif (self.index == 1 or self.index == 3):
+                        if action == Directions.EAST and close_dist < 4:
+                            features['settle'] = 1
                     # features['fleeEnemy'] = 1.0 / close_dist
+                #if action == Directions.EAST and (self.index == 0 or self.index == 2):
+                #    features['settle'] = -1
+                #elif action == Directions.WEST and (self.index == 1 or self.index == 3):
+                #    features['settle'] = -1
             # elif successor.getAgentState(self.index).isPacman and not notInWay:
                 # TODO if notInWay is fixed, this is viable
             #    features['fleeEnemy'] = 1.0 / close_dist
@@ -239,7 +251,6 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
         ''' ----END OF FEATURE---- '''
 
         ''' FOOD FEATURE '''
-        foodList = self.getFood(successor).asList()
         # Compute distance to the nearest food
         if len(foodList) > 0:
             myPos = successor.getAgentState(self.index).getPosition()
@@ -272,7 +283,7 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
 
     def getWeights(self, gameState, action):
         return {'successorScore': 100, 'distanceToFood': -1, 'fleeEnemy': -100.0, 'fleeHome': -100,
-                'defend': -100, 'settle': 1000}
+                'defend': -1000, 'settle': 1000} #FIXME changes defend from -100 to -1000
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):

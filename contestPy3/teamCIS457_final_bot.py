@@ -138,9 +138,13 @@ class ReflexCaptureAgent(CaptureAgent):
         """
         Finds the distance from the agent to the Power Capsule
         """
-        PC = self.getCapsules(gameState)[0]
-        myPos = gameState.getAgentState(self.index).getPosition()
-        return self.getMazeDistance(myPos, PC)
+
+        if len(self.getCapsules(gameState)) > 0:
+            PC = self.getCapsules(gameState)[0]
+            myPos = gameState.getAgentState(self.index).getPosition()
+            return self.getMazeDistance(myPos, PC)
+        else:
+            return -1
 
     def estEnemyDist(self, gameState):
         """
