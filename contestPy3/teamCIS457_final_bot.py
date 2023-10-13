@@ -195,8 +195,13 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
                     features['fleeHome'] = self.getMazeDistance(myPos, self.start)
             elif not successor.getAgentState(self.index).isPacman:  # and notInWay:
                 # If you are a ghost, you are only in danger if you cross the border
-                if action == Directions.STOP:
-                    features['settle'] = 1
+                if (self.index == 0 or self.index == 2):
+                    # Moving increases visible area and allows for enemies to leave radius
+                    if action == Directions.WEST and close_dist < 4:
+                        features['settle'] = 1
+                elif (self.index == 1 or self.index == 3):
+                    if action == Directions.EAST and close_dist < 4:
+                        features['settle'] = 1
             elif not successor.getAgentState(self.index).isPacman and not notInWay:
                 # Their turn to run, now.
                 features['defend'] = close_dist
