@@ -31,6 +31,16 @@ def createTeam(firstIndex, secondIndex, isRed,
     """
     return [eval(first)(firstIndex), eval(second)(secondIndex)]
 
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"""                                                   """
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+'''THIS FILE IS NOT IN ANY WAY A MAJOR SUBMISSION FILE. THIS IS A VARIATION OF THE TEAMCIS457_FINAL_BOT WITH TODOs 
+AND FIXMEs USED FOR DEVELOPMENT AND KEEPING TRACK OF WHAT CAN BE DONE STILL
+please dont grade us harshly cause this is messy with comments, this file is basically just for my reference
+'''
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+"""                                                   """
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 ##########
 # Agents #
