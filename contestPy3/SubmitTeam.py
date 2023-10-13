@@ -205,11 +205,6 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
             distToPC = self.getDistToPC(successor)
             if len(chasers) > 1 and distToPC < close_dist:
                 features['PCDistance'] = distToPC
-
-        # View the action and close distance information for each
-        # possible move choice.
-        print("Action: " + str(action))
-        print("\t\t" + str(close_dist), sys.stderr)
         ''' ----END OF FEATURE---- '''
 
         ''' FOOD FEATURE '''
